@@ -58,37 +58,43 @@ function Shot-Screen([string]$name) {
 
 $pchc = Join-Path $env:ProgramFiles 'PCHealthCheck\PCHealthCheck.exe'
 
-# n = bestandsnaam, m = window/screen, t = wat moet zichtbaar zijn, o = wat het script opent
+# Windows-versie bepalen: build 22000 of hoger = Windows 11
+$build = [Environment]::OSVersion.Version.Build
+$os = if ($build -ge 22000) { '11' } else { '10' }
+Write-Host "Gevonden: Windows $os (build $build). Bestanden krijgen het achtervoegsel -w$os." -ForegroundColor Cyan
+
+# n = bestandsnaam, v = alleen op Windows 10/11 ('' = allebei), m = window/screen, t = wat moet zichtbaar zijn, o = wat het script opent
 $steps = @(
-    @{ n='03_w10-einde-support';       m='window'; t='ALLEEN op een Windows 10-pc: Windows Update met de melding over einde ondersteuning'; o={ Start-Process 'ms-settings:windowsupdate' } },
-    @{ n='02-1_systeeminfo';           m='window'; t='Editie, RAM, 64-bit (Info / About)';                          o={ Start-Process 'ms-settings:about' } },
-    @{ n='02-2_winver';                m='window'; t='Versie en build';                                             o={ Start-Process 'winver.exe' } },
-    @{ n='02-3_bitlocker-status';      m='window'; t='BitLocker aan op C: (GEEN herstelsleutel tonen)';           o={ Start-Process 'control.exe' -ArgumentList '/name Microsoft.BitLockerDriveEncryption' } },
-    @{ n='04-1_pc-health-check';       m='window'; t='PC Health Check: klik eerst op "Nu controleren"';            o={ if (Test-Path $pchc) { Start-Process $pchc } else { Write-Host '  PC Health Check niet gevonden: installeer via aka.ms/GetPCHealthCheckApp' -ForegroundColor Yellow } } },
-    @{ n='04-1_tpm';                   m='window'; t='Specificatieversie 2.0 (vraagt beheerdersrechten)';         o={ Start-Process 'mmc.exe' -ArgumentList 'tpm.msc' -Verb RunAs } },
-    @{ n='04-1_msinfo32';              m='window'; t='BIOS-modus UEFI en Status Secure Boot: Aan';                  o={ Start-Process 'msinfo32.exe' } },
-    @{ n='04-1_powershell';            m='window'; t='Uitvoer van Get-Tpm en Confirm-SecureBootUEFI';               o={ Start-Process 'powershell.exe' -Verb RunAs -ArgumentList '-NoExit','-Command','Get-Tpm; Confirm-SecureBootUEFI' } },
-    @{ n='04-2_device-security';       m='window'; t='Apparaatbeveiliging: kernisolatie, beveiligingsprocessor, Secure Boot'; o={ Start-Process 'windowsdefender://devicesecurity' } },
-    @{ n='04-2_geheugenintegriteit';   m='window'; t='Geheugenintegriteit: Aan';                                    o={ Start-Process 'windowsdefender://coreisolation' } },
-    @{ n='04-2_smart-app-control';     m='window'; t='App- en browserbeheer > Smart App Control';                   o={ Start-Process 'windowsdefender://appbrowser' } },
-    @{ n='04-2_windows-hello';         m='window'; t='Aanmeldingsopties (Windows Hello)';                           o={ Start-Process 'ms-settings:signinoptions' } },
-    @{ n='04-3_windows-update';        m='window'; t='Windows Update met versie';                                   o={ Start-Process 'ms-settings:windowsupdate' } },
-    @{ n='04-3_werk-of-school';        m='window'; t='Toegang tot werk of school (alleen op bedrijfs-pc)';          o={ Start-Process 'ms-settings:workplace' } },
-    @{ n='04-4_taakbalk-w11';          m='screen'; t='Druk na Enter op de Windows-toets: Start-menu in het midden'; o={ } },
-    @{ n='04-4_taakbalk-w10';          m='screen'; t='ALLEEN op een Windows 10-pc: Start-menu open';                o={ } },
-    @{ n='06_snap-layouts';            m='screen'; t='Houd na Enter de muis op de knop Maximaliseren van een venster'; o={ Start-Process 'notepad.exe' } },
-    @{ n='06_verkenner-tabs';          m='window'; t='Verkenner met 2-3 tabbladen (Ctrl+T)';                        o={ Start-Process 'explorer.exe' } },
-    @{ n='06_bureaubladen';            m='screen'; t='Druk na Enter op Windows+Tab, met 2 bureaubladen';            o={ } },
-    @{ n='06_pincode-instellen';       m='window'; t='Aanmeldingsopties > Pincode (Windows Hello) > Instellen';     o={ Start-Process 'ms-settings:signinoptions' } },
-    @{ n='05_onedrive-backup';         m='window'; t='Windows-back-up / OneDrive-mappen';                           o={ Start-Process 'ms-settings:backup' } },
-    @{ n='05_hyper-v-test';            m='window'; t='Hyper-V-beheer met een test-VM (optioneel)';                  o={ Start-Process 'virtmgmt.msc' } }
+    @{ n='03_einde-support';          v='10'; m='window'; t='Windows Update met de melding dat Windows 10 geen ondersteuning meer krijgt'; o={ Start-Process 'ms-settings:windowsupdate' } },
+    @{ n='02-1_systeeminfo';          v='';   m='window'; t='Editie, RAM, 64-bit (Info)';                                  o={ Start-Process 'ms-settings:about' } },
+    @{ n='02-2_winver';               v='';   m='window'; t='Versie en build';                                             o={ Start-Process 'winver.exe' } },
+    @{ n='02-3_bitlocker-status';     v='';   m='window'; t='BitLocker-status van C: (GEEN herstelsleutel tonen). Alleen Pro/Enterprise.'; o={ Start-Process 'control.exe' -ArgumentList '/name Microsoft.BitLockerDriveEncryption' } },
+    @{ n='04-1_pc-health-check';      v='';   m='window'; t='PC Health Check: klik eerst op "Nu controleren" en wacht op het resultaat'; o={ if (Test-Path $pchc) { Start-Process $pchc } else { Write-Host '  PC Health Check niet gevonden: installeer via aka.ms/GetPCHealthCheckApp en druk dan Enter' -ForegroundColor Yellow } } },
+    @{ n='04-1_tpm';                  v='';   m='window'; t='Specificatieversie (2.0?) - vraagt beheerdersrechten';       o={ Start-Process 'mmc.exe' -ArgumentList 'tpm.msc' -Verb RunAs } },
+    @{ n='04-1_msinfo32';             v='';   m='window'; t='BIOS-modus (UEFI/verouderd) en Status Secure Boot';          o={ Start-Process 'msinfo32.exe' } },
+    @{ n='04-1_powershell';           v='';   m='window'; t='Uitvoer van Get-Tpm en Confirm-SecureBootUEFI';               o={ Start-Process 'powershell.exe' -Verb RunAs -ArgumentList '-NoExit','-Command','Get-Tpm; Confirm-SecureBootUEFI' } },
+    @{ n='04-2_device-security';      v='';   m='window'; t='Apparaatbeveiliging: kernisolatie, beveiligingsprocessor, Secure Boot'; o={ Start-Process 'windowsdefender://devicesecurity' } },
+    @{ n='04-2_geheugenintegriteit';  v='';   m='window'; t='Kernisolatie > Geheugenintegriteit (aan of uit)';            o={ Start-Process 'windowsdefender://coreisolation' } },
+    @{ n='04-2_smart-app-control';    v='11'; m='window'; t='App- en browserbeheer > Smart App Control';                   o={ Start-Process 'windowsdefender://appbrowser' } },
+    @{ n='04-2_windows-hello';        v='';   m='window'; t='Aanmeldingsopties (Windows Hello)';                           o={ Start-Process 'ms-settings:signinoptions' } },
+    @{ n='04-3_windows-update';       v='';   m='window'; t='Windows Update met versie-info';                              o={ Start-Process 'ms-settings:windowsupdate' } },
+    @{ n='04-3_werk-of-school';       v='';   m='window'; t='Toegang tot werk of school (alleen op bedrijfs-pc)';          o={ Start-Process 'ms-settings:workplace' } },
+    @{ n='04-4_startmenu';            v='';   m='screen'; t='Druk na Enter op de Windows-toets: Start-menu open';          o={ } },
+    @{ n='06_snap';                   v='';   m='screen'; t='W11: muis op Maximaliseren (Snap Layouts). W10: 2 vensters naast elkaar met Windows+pijl'; o={ Start-Process 'notepad.exe' } },
+    @{ n='06_verkenner';              v='';   m='window'; t='Verkenner (W11: open 2-3 tabbladen met Ctrl+T)';              o={ Start-Process 'explorer.exe' } },
+    @{ n='06_bureaubladen';           v='';   m='screen'; t='Druk na Enter op Windows+Tab, met 2 bureaubladen';            o={ } },
+    @{ n='06_pincode-instellen';      v='';   m='window'; t='Aanmeldingsopties > Pincode (Windows Hello)';                 o={ Start-Process 'ms-settings:signinoptions' } },
+    @{ n='05_back-up';                v='';   m='window'; t='Back-up / OneDrive-mappen';                                   o={ Start-Process 'ms-settings:backup' } },
+    @{ n='05_hyper-v-test';           v='';   m='window'; t='Hyper-V-beheer met een test-VM (optioneel)';                  o={ Start-Process 'virtmgmt.msc' } }
 )
 
+$todo = @($steps | Where-Object { $_.v -eq '' -or $_.v -eq $os })
 $i = 0
-foreach ($s in $steps) {
+foreach ($s in $todo) {
     $i++
+    $name = "$($s.n)-w$os"
     Write-Host ""
-    Write-Host "[$i/$($steps.Count)] $($s.n)" -ForegroundColor Cyan
+    Write-Host "[$i/$($todo.Count)] $name" -ForegroundColor Cyan
     Write-Host "  Toon: $($s.t)"
     $a = Read-Host "  Enter = openen, s = overslaan, q = stoppen"
     if ($a -eq 'q') { break }
@@ -96,7 +102,7 @@ foreach ($s in $steps) {
     try { & $s.o } catch { Write-Host "  Openen mislukt: $($_.Exception.Message)" -ForegroundColor Yellow }
     $a = Read-Host "  Zet het klaar en druk Enter om de foto te nemen (s = overslaan)"
     if ($a -eq 's') { continue }
-    if ($s.m -eq 'screen') { Shot-Screen $s.n } else { Shot-Window $s.n }
+    if ($s.m -eq 'screen') { Shot-Screen $name } else { Shot-Window $name }
 }
 
 Write-Host ""
